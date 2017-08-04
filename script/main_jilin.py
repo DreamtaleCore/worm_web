@@ -231,8 +231,8 @@ print("The Total list is %d, begin processing..." % info_sum)
 print("============================================")
 time_begin = time.time()
 # Step 1.3: Get all apartments's name and links then dig them
-threshold_min = 39
-threshold_max = 50
+threshold_min = 46
+threshold_max = 55
 for gov_apartment_line in gov_apartment_lines:
     if info_index < threshold_min:
         info_index = info_index + 1
@@ -287,47 +287,51 @@ for gov_apartment_line in gov_apartment_lines:
                 pass
             duty_page = getLinkContent(duty_link + index)
 
-            duty_page = duty_page.replace('</p>', '<br />')
+            # duty_page = duty_page.replace('</p>', '<br />')
             duty_temp = BeautifulSoup(duty_page, 'html.parser').find_all('td', {'class': 'dis2'})
             if duty_temp:
                 duty_info = duty_temp[0]
-                duty_info = replaceStr(str(duty_info))
-                duties = gov_apartment_duties_finder.findall(duty_info)
-                if len(duties) == 1:
-                    temp_str = duties[0]
-                    tmp_finder = re.compile("normal;\">(.*?)。")
-                    tmp_rlt = tmp_finder.findall(duty_page)
-                    for t in tmp_rlt:
-                        if t.find("widow-orphan") != -1:
-                            tmp1_finder = re.compile("EN-US>\)</span>(.*?)BB")
-                            tmp1_rlt = tmp1_finder.findall(t)
-                            if tmp1_rlt:
-                                t = tmp1_rlt[0]
-                            else:
-                                t = ''
-                            pass
-                        if t != '':
-                            apartment.duties.append(t)
-                            pass
-                    pass
-                else:
-                    for d in duties:
-                        if d != 'BB':
-                            t = d.replace('\"', '').replace('\n', '')
-                            if t.find("widow-orphan") != -1:
-                                tmp1_finder = re.compile("EN-US>\)</span>(.*?)BB")
-                                tmp1_rlt = tmp1_finder.findall(t + 'BB')
-                                if tmp1_rlt:
-                                    t = tmp1_rlt[0]
-                                else:
-                                    t = ''
-                                pass
-                            if t != '':
-                                apartment.duties.append(t)
-                                pass
-                            pass
-                        pass
-                    pass
+                duty_text = BeautifulSoup(str(duty_info), 'html.parser')\
+                    .getText().replace('\"', '').replace('\n', '').replace('\r', '')
+                print(duty_text)
+                apartment.duties.append(duty_text)
+                # duty_info = replaceStr(str(duty_info))
+                # duties = gov_apartment_duties_finder.findall(duty_info)
+                # if len(duties) == 1:
+                #     temp_str = duties[0]
+                #     tmp_finder = re.compile("normal;\">(.*?)。")
+                #     tmp_rlt = tmp_finder.findall(duty_page)
+                #     for t in tmp_rlt:
+                #         if t.find("widow-orphan") != -1:
+                #             tmp1_finder = re.compile("EN-US>\)</span>(.*?)BB")
+                #             tmp1_rlt = tmp1_finder.findall(t)
+                #             if tmp1_rlt:
+                #                 t = tmp1_rlt[0]
+                #             else:
+                #                 t = ''
+                #             pass
+                #         if t != '':
+                #             apartment.duties.append(t)
+                #             pass
+                #     pass
+                # else:
+                #     for d in duties:
+                #         if d != 'BB':
+                #             t = d.replace('\"', '').replace('\n', '')
+                #             if t.find("widow-orphan") != -1:
+                #                 tmp1_finder = re.compile("EN-US>\)</span>(.*?)BB")
+                #                 tmp1_rlt = tmp1_finder.findall(t + 'BB')
+                #                 if tmp1_rlt:
+                #                     t = tmp1_rlt[0]
+                #                 else:
+                #                     t = ''
+                #                 pass
+                #             if t != '':
+                #                 apartment.duties.append(t)
+                #                 pass
+                #             pass
+                #         pass
+                #     pass
                 pass
             pass
         print("          Step 3 completed.")
@@ -337,7 +341,7 @@ for gov_apartment_line in gov_apartment_lines:
     # region Step 4：Get the bounder information from the child page
     if debug_mode:
         # Step 4.1: Gather all sub links of bounder
-        bounder_link = root_link + classes_links[1]
+        bounder_link = child_link + classes_links[1]
         bounder_page = getLinkContent(bounder_link)
 
         page_sum = gov_apartment_page_sum_finder.findall(bounder_page)
@@ -371,6 +375,7 @@ for gov_apartment_line in gov_apartment_lines:
                     pass
                 bounder_sub_link = bounder_link + bounder_sub_links[0]
                 bounder_sub_page = getLinkContent(bounder_sub_link)
+                print('bounder sub link: ', bounder_sub_link)
                 # Step 4.1 Get bounder detail page's content and deal with the table
 
                 # Step 4.2 Gather and classify all tds into new_line object
