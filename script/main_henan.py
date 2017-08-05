@@ -20,33 +20,19 @@ file_txt.write(",".join(head_line))
 
 
 # region main classes
-class Stage(object):
-    def __init__(self):
-        stage_name = ''
-        matter = ''
-        office = ''
-        promise_span = ''
-        law_span = ''
-        pass
-    pass
-
-
-class ItemTable(object):
-    def __init__(self):
-        self.seq_num = ''
-        self.name = ''
-        self.child = ''
-        self.dependence = ''
-        self.stages = []
-        self.payment = ''
-        pass
-    pass
-
-
 class Apartment(object):
     def __init__(self):
-        self.gov_apartment = ''
-        self.item_tables = []
+        self.apartment_names = []
+        self.seq_numbers = []
+        self.duty_names = []
+        self.sub_items = []
+        self.dependence = []
+        self.stage_names = []
+        self.matters = []
+        self.offices = []
+        self.promise_spans = []
+        self.law_spans = []
+        self.payments = []
         pass
     pass
 
@@ -98,10 +84,10 @@ def writeElementToList(a_list=[], l_rlt=[], flag=False):
 # Write new_line's elements to file_out
 def writeNewLineToFile(lines=apartments, filename=file_csv_name):
     # translate the line to text
-    l_department_name = []
-    l_seq_num = []
-    l_name = []
-    l_child = []
+    l_apartment_name = []
+    l_seq_number = []
+    l_duty_name = []
+    l_sub_item = []
     l_dependence = []
     l_stage_name = []
     l_matter = []
@@ -110,43 +96,34 @@ def writeNewLineToFile(lines=apartments, filename=file_csv_name):
     l_law_span = []
     l_payment = []
     for line in lines:
-        l_department_name.append(line.gov_apartment)
-        l_department_name = addNullStringToList(l_department_name, 6 * (len(line.item_tables)) - 1)
-        for item in line.item_tables:
-            l_seq_num.append(item.seq_num.replace('\xa0', ''))
-            l_seq_num = addNullStringToList(l_seq_num, 5)
-            l_name.append(item.name.replace('\xa0', ''))
-            l_name = addNullStringToList(l_name, 5)
-            l_child.append(item.child.replace('\xa0', ''))
-            l_child = addNullStringToList(l_child, 5)
-            l_payment.append(item.payment.replace('\xa0', ''))
-            l_payment = addNullStringToList(l_payment, 5)
-            l_dependence.append(item.dependence.replace('\xa0', ''))
-            l_dependence = addNullStringToList(l_dependence, 5)
-            for stage in item.stages:
-                l_stage_name.append(stage.stage_name.replace('\xa0', ''))
-                l_matter.append(stage.matter.replace('\xa0', ''))
-                l_office.append(stage.office.replace('\xa0', ''))
-                l_promise_span.append(stage.promise_span.replace('\xa0', ''))
-                l_law_span.append(stage.law_span.replace('\xa0', ''))
-                pass
-            if not item.stages:
-                for ii in range(6):
-                    l_stage_name.append('')
-                    l_matter.append('')
-                    l_office.append('')
-                    l_promise_span.append('')
-                    l_law_span.append('')
-                    pass
-                pass
+        while True:
+            end_flag = True
+
+            l_apartment_name, end_flag = writeElementToList(line.apartment_names, l_apartment_name, end_flag)
+            l_seq_number, end_flag = writeElementToList(line.seq_numbers, l_seq_number, end_flag)
+            l_duty_name, end_flag = writeElementToList(line.duty_names, l_duty_name, end_flag)
+            l_sub_item, end_flag = writeElementToList(line.sub_items, l_sub_item, end_flag)
+            l_dependence, end_flag = writeElementToList(line.dependence, l_dependence, end_flag)
+            l_stage_name, end_flag = writeElementToList(line.stage_names, l_stage_name, end_flag)
+            l_matter, end_flag = writeElementToList(line.matters, l_matter, end_flag)
+            l_office, end_flag = writeElementToList(line.offices, l_office, end_flag)
+            l_promise_span, end_flag = writeElementToList(line.promise_spans, l_promise_span, end_flag)
+            l_law_span, end_flag = writeElementToList(line.law_spans, l_law_span, end_flag)
+            l_payment, end_flag = writeElementToList(line.payments, l_payment, end_flag)
+
+            if end_flag:
+                break
             pass
         pass
-    text_list = [l_department_name, l_seq_num, l_name, l_child,
+
+    text_list = [l_apartment_name, l_seq_number, l_duty_name, l_sub_item,
                  l_dependence, l_stage_name, l_matter, l_office,
                  l_promise_span, l_law_span, l_payment]
 
     # Like matrix's transpose
     text_list = list(zip(*text_list))
+    if sum([len(ii) for ii in text_list[-1]]) == 0:
+        text_list.pop(-1)
 
     with open(file=filename, mode='a', encoding=decode_type, newline='') as file_csv:
         writer = csv.writer(file_csv)
@@ -220,8 +197,8 @@ info_index = 0
 print("The Total list is %d, begin processing..." % info_sum)
 print("============================================")
 time_begin = time.time()
-threshold_min = 42
-threshold_max = 60
+threshold_min = 5
+threshold_max = 10
 # Step 1.3: Get all apartments's name and links then dig them
 for gov_apartment_line in gov_apartment_lines:
     if info_index < threshold_min:
@@ -241,7 +218,7 @@ for gov_apartment_line in gov_apartment_lines:
     if gov_apartment_link:
         gov_apartment_link = gov_apartment_link[0]  # Same as the name
         pass
-    apartment.gov_apartment = gov_apartment_name
+    apartment.apartment_names.append(gov_apartment_name)
 
     info_index = info_index + 1
     print("The ", info_index, "('st) item: ", gov_apartment_name, "| and completed: ",
@@ -251,10 +228,12 @@ for gov_apartment_line in gov_apartment_lines:
     # region Step 2: Gather information from the detail link
     # Step 2.1: Get the content from child page
     child_link = root_link + 'zrqd' + gov_apartment_link
+    child_link = 'http://www.henan.gov.cn/zwgk/zrqd/gat/'
     child_page = getLinkContent(child_link)
     print("          Step 2 completed.")
     # endregion
 
+# TODO: Some error here and not for all pass
     # region Step 3: Get the detail pages from the child page
     if debug_mode:
         detail_links = gov_apartment_detail_finder.findall(child_page)
@@ -264,72 +243,89 @@ for gov_apartment_line in gov_apartment_lines:
             detail_index = detail_index + 1
             print('             Begin dealing with ', detail_index, ' ...')
             print('             Link is ', detail_link)
-            # detail_link = 'http://www.henan.gov.cn/zwgk/system/2015/10/23/010593851.shtml'
+            # detail_link = 'http://www.henan.gov.cn/zwgk/system/2015/10/31/010597737.shtml'
             detail_page = getLinkContent(detail_link)
-            detail_tds = BeautifulSoup(detail_page, 'html.parser').find_all('td')
-            detail_items = []
-            for detail_td in detail_tds:
-                detail_items.append(BeautifulSoup(str(detail_td), 'html.parser').getText())
-                pass
-            item_table = ItemTable()
-            while detail_items and detail_items.pop(0) != '收费情况\r\n            及依据':
-                pass
-            if len(detail_items) > 33:
-                success_flag = True
-                item_table.seq_num = detail_items[0].replace('\"', '').replace('\n', '').replace('\r', '')
-                item_table.name = detail_items[1].replace('\"', '').replace('\n', '').replace('\r', '')
-                item_table.child = detail_items[2].replace('\"', '').replace('\n', '').replace('\r', '')
-                item_table.dependence = detail_items[3].replace('\"', '').replace('\n', '').replace('\r', '')
-                item_table.payment = detail_items[9].replace('\"', '').replace('\n', '').replace('\r', '')
-                stage1 = Stage()
-                stage1.stage_name = detail_items[4].replace('\"', '').replace('\n', '').replace('\r', '')
-                stage1.matter = detail_items[5].replace('\"', '').replace('\n', '').replace('\r', '')
-                stage1.office = detail_items[6].replace('\"', '').replace('\n', '').replace('\r', '')
-                stage1.promise_span = detail_items[7].replace('\"', '').replace('\n', '').replace('\r', '')
-                stage1.law_span = detail_items[8].replace('\"', '').replace('\n', '').replace('\r', '')
-                item_table.stages.append(stage1)
-                stage2 = Stage()
-                stage2.stage_name = detail_items[10].replace('\"', '').replace('\n', '').replace('\r', '')
-                stage2.matter = detail_items[11].replace('\"', '').replace('\n', '').replace('\r', '')
-                stage2.office = detail_items[12].replace('\"', '').replace('\n', '').replace('\r', '')
-                stage2.promise_span = detail_items[13].replace('\"', '').replace('\n', '').replace('\r', '')
-                stage2.law_span = detail_items[14].replace('\"', '').replace('\n', '').replace('\r', '')
-                item_table.stages.append(stage2)
-                stage3 = Stage()
-                stage3.stage_name = detail_items[15].replace('\"', '').replace('\n', '').replace('\r', '')
-                stage3.matter = detail_items[16].replace('\"', '').replace('\n', '').replace('\r', '')
-                stage3.office = detail_items[17].replace('\"', '').replace('\n', '').replace('\r', '')
-                stage3.promise_span = detail_items[18].replace('\"', '').replace('\n', '').replace('\r', '')
-                stage3.law_span = '与审查共用'
-                item_table.stages.append(stage3)
-                stage4 = Stage()
-                stage4.stage_name = detail_items[19].replace('\n', '').replace('\r', '')
-                stage4.matter = detail_items[20].replace('\n', '').replace('\r', '')
-                stage4.office = detail_items[21].replace('\n', '').replace('\r', '')
-                stage4.promise_span = detail_items[22].replace('\n', '').replace('\r', '')
-                stage4.law_span = detail_items[23].replace('\n', '').replace('\r', '')
-                item_table.stages.append(stage4)
-                stage5 = Stage()
-                stage5.stage_name = detail_items[24].replace('\n', '').replace('\r', '')
-                stage5.matter = detail_items[25].replace('\n', '').replace('\r', '')
-                stage5.office = detail_items[26].replace('\n', '').replace('\r', '')
-                stage5.promise_span = detail_items[27].replace('\n', '').replace('\r', '')
-                stage5.law_span = detail_items[28].replace('\n', '').replace('\r', '')
-                item_table.stages.append(stage5)
-                stage6 = Stage()
-                stage6.stage_name = detail_items[29].replace('\n', '').replace('\r', '')
-                stage6.matter = detail_items[30].replace('\n', '').replace('\r', '')
-                stage6.office = detail_items[31].replace('\n', '').replace('\r', '')
-                stage6.promise_span = detail_items[32].replace('\n', '').replace('\r', '')
-                stage6.law_span = detail_items[33].replace('\n', '').replace('\r', '')
-                item_table.stages.append(stage6)
-                pass
-            if success_flag:
-                apartment.item_tables.append(item_table)
-                pass
-            pass
-        print('             writing to file ...')
-        writeNewLineToFile([apartment], file_csv_name)
+            detail_trs = BeautifulSoup(detail_page, 'html.parser').find_all('tr')
+            if len(detail_trs) > 3:
+                tds = BeautifulSoup(str(detail_trs[3]), 'html.parser').find_all('td')
+                if tds:
+                    td_text = BeautifulSoup(str(tds[0]), 'html.parser').getText()
+                    item_list = []
+                    items_raw = td_text.split('\n\n')
+                    if len(items_raw) > 5:
+                        for items in items_raw:
+                            item_tmp = items.split('\n')
+                            item_tmp1 = []
+                            for tmp in item_tmp:
+                                if tmp != '':
+                                    tmp = tmp.replace('\xa0', ' ').replace('\r', '')
+                                    if tmp[0:5] == '     ':
+                                        item_tmp1[-1] = item_tmp1[-1] + tmp.replace(' ', '')
+                                    else:
+                                        item_tmp1.append(tmp)
+                            if item_tmp1:
+                                item_list.append(item_tmp1)
+                                pass
+                            pass
+                        pass
+                    for ii in item_list:
+                        print(ii)
+                        pass
+                    while item_list and '序号' not in item_list[0]:
+                        item_list.pop(0)
+                    tmp_list = []
+                    while item_list and '收费情况及依据' not in item_list[0]:
+                        tmp_list = tmp_list + item_list.pop(0)
+                    if item_list:
+                        item_list[0] = tmp_list + item_list[0]
+                    else:
+                        item_list.append(tmp_list)
+                    if not item_list:   # error item
+                        continue
+                    header = item_list.pop(0)
+                    sub_item_flag = '子项' in header
+                    first_row_flag = True
+                    while item_list:
+                        item_row = item_list.pop(0)
+
+                        if '服务电话' in item_row[0]:
+                            break
+                        if '受理地点' in item_row[0]:
+                            break
+                        if first_row_flag is True:
+                            if len(item_row) < 2:
+                                while (item_row and ('不收费' not in item_row[-1]) and item_list) \
+                                        or (not item_row and item_list):
+                                    item_row = item_row + item_list.pop(0)
+                            apartment.seq_numbers.append(item_row.pop(0))
+                            apartment.duty_names.append(item_row.pop(0))
+                            if sub_item_flag is True:
+                                apartment.sub_items.append(item_row.pop(0))
+                            while (item_row and ('不收费' not in item_row[-1] and len(item_row[-1]) > 4) and item_list)\
+                                    or (not item_row and item_list):
+                                item_row = item_row + item_list.pop(0)
+                            apartment.payments.append(item_row.pop(-1))
+                            while item_row and len(item_row[0]) != len('受理'):
+                                apartment.dependence.append(item_row.pop(0))
+                            first_row_flag = False
+                            if not item_row:
+                                break
+                            pass
+                        while len(item_row) < 5 and item_list:
+                            item_row = item_row + item_list.pop(0)
+                            if item_list and ('日' not in item_list[0]) and len(item_row) == 4:
+                                break
+                        apartment.stage_names.append(item_row.pop(0))
+                        apartment.matters.append(item_row.pop(0))
+                        apartment.offices.append(item_row.pop(0))
+                        if item_row:
+                            apartment.promise_spans.append(item_row.pop(0))
+                        if item_row:
+                            apartment.law_spans.append(item_row.pop(0))
+                        pass
+
+            # apartments.append(apartment)
+            writeNewLineToFile([apartment])
         pass
     pass
 
