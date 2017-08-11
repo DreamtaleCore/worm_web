@@ -8,7 +8,7 @@ import time
 
 # region global parameters
 debug_mode = True
-root_link = "http://qzqd.shaanxi.gov.cn/smp/jsp/portals/index.jsp"
+root_link = "http://zwfw.sd.gov.cn"
 decode_type = "utf-8"
 file_txt = open("../data/rlt_gov.txt", 'w', encoding='utf-8')
 file_csv_name = "../data/rlt_gov.csv"
@@ -24,8 +24,7 @@ class Duty(object):
     def __init__(self):
         self.main_duty = []
         self.work_options = []
-        self.offices = []
-        self.remarks = []
+        self.dependence = []
         pass
     pass
 
@@ -66,15 +65,23 @@ apartments = []
 # region general functions
 # --------------------------------------------------------------------
 # Get the link's content and return its content as a multi-line string
-def getLinkContent(link):
-    try:
-        response = request.urlopen(link)
-        page = response.read()
-        page = page.decode(decode_type)
-        page = str(page)
-    except error.HTTPError as reason:
-        page = ''
-        print(reason)
+def getLinkContent(link, try_max_times=5):
+    for ii in range(try_max_times):
+        try:
+            try:
+                response = request.urlopen(link, timeout=3)
+                page = response.read()
+                page = page.decode(decode_type)
+                page = str(page)
+            except TimeoutError as reason:
+                page = ''
+                print(reason)
+        except error.HTTPError as reason:
+            page = ''
+            print(reason, "\n\tand try ", ii, ' time...')
+        if page != '':
+            break
+        pass
     return page
 # --------------------------------------------------------------------
 
@@ -113,7 +120,7 @@ def writeNewLineToFile(lines=apartments, filename=file_csv_name):
         service = Service()
         while True:
             end_flag = True
-            if line.duties and not duty.remarks and not duty.offices\
+            if line.duties and not duty.remarks and not duty.dependence\
                     and not duty.work_options and not duty.main_duty:
                 duty = line.duties.pop(0)
                 pass
@@ -128,7 +135,7 @@ def writeNewLineToFile(lines=apartments, filename=file_csv_name):
 
             l_main_duty, end_flag = writeElementToList(duty.main_duty, l_main_duty, end_flag)
             l_work_option, end_flag = writeElementToList(duty.work_options, l_work_option, end_flag)
-            l_office, end_flag = writeElementToList(duty.offices, l_office, end_flag)
+            l_office, end_flag = writeElementToList(duty.dependence, l_office, end_flag)
             l_remark, end_flag = writeElementToList(duty.remarks, l_remark, end_flag)
 
             l_manage_option, end_flag = writeElementToList(bounder.manage_options, l_manage_option, end_flag)
@@ -201,6 +208,12 @@ def removeUselessTds(tds=list()):
 def getPureText(src=str()):
     return BeautifulSoup(src, "html.parser").getText()
 # --------------------------------------------------------------------
+
+
+# --------------------------------------------------------------------
+def simplifyStr(src=str()):
+    return src.replace('\n', '').replace('\r', '')
+# --------------------------------------------------------------------
 # endregion
 
 
@@ -208,7 +221,7 @@ def getPureText(src=str()):
 # region some re block and key words finder
 ######################################################################
 gov_apartment_line_finder = re.compile("<a class=\"bmys\"(.*?)/div>", re.M)
-gov_apartment_link_finder = re.compile("href = \"(.*?)\"")
+gov_apartment_link_finder = re.compile("href=\"(.*?)\"")
 gov_apartment_name_finder = re.compile("title=\"(.*?)\"")
 
 gov_apartment_duty_finder = re.compile("<a href='DtlBMZZ(.*?)'")
@@ -220,16 +233,18 @@ gov_apartment_general_finder = re.compile("<td align=\"left\" style=\"border(.*?
 
 # Step 1: Gather information from the root page
 # Step 1.1: Get the content of root page
-root_page = getLinkContent(root_link + 'ZrbjMain.aspx?DepId=45')
+root_page = getLinkContent(root_link + '/sdzw/bscx/qlqd/zrqd_show.do?orgcode=SD370000FG')
 
 # Step 1.2: From the root page get all gov apartments' name and its link
-gov_apartment_lines = gov_apartment_line_finder.findall(root_page)
+# gov_apartment_lines = gov_apartment_line_finder.findall(root_page)
+gov_apartment_lines = BeautifulSoup(root_page, 'html.parser').find_all('a', {'class': 'bmys'})
 info_sum = len(gov_apartment_lines)
 info_index = 0
 print("The Total list is %d, begin processing..." % info_sum)
 print("============================================")
 time_begin = time.time()
 # Step 1.3: Get all apartments's name and links then dig them
+is_first_flag = True
 for gov_apartment_line in gov_apartment_lines:
     apartment = Apartment()
     # region Step 1.4: Prepare the apartment's header
@@ -251,106 +266,107 @@ for gov_apartment_line in gov_apartment_lines:
 
     # region Step 2: Gather information from the detail link
     # Step 2.1: Get the content from child page
-    child_link = root_link + 'ZrbjMain' + gov_apartment_link
-    child_page = getLinkContent(child_link)
+    if is_first_flag:
+        gov_apartment_link = '/sdzw/bscx/qlqd/zrqd_show.do?orgcode=SD370000FG'
+
+    gov_apartment_code = gov_apartment_link.split('?')[1]
+    child_link = root_link + gov_apartment_link
+
+    if not is_first_flag:
+        child_page = getLinkContent(child_link)
     # endregion
 
     # region Step 3: Get the duty information from the child page
-    if debug_mode:
-        duty_details = gov_apartment_duty_finder.findall(child_page)
-        duty_details = simplifyList(duty_details)
-        for duty_detail in duty_details:
-            duty_detail_link = root_link + 'DtlBMZZ' + duty_detail
+    if not debug_mode:
+        duty_item_index = 1
+        while True:
+            duty_detail_link = root_link + '/sdzw/zrqd/orgduty/detail.do?' \
+                               + gov_apartment_code + '&sn=' + str(duty_item_index)
+            duty_item_index = duty_item_index + 1
 
             # Step 3.1 Get duty detail page's content and deal with the table
             duty_detail_page = getLinkContent(duty_detail_link)
-            duty_detail_soup = BeautifulSoup(duty_detail_page, "html.parser")
-            duty_detail_tds = duty_detail_soup.find_all(name='td')
-            duty_detail_tds = removeUselessTds(list(duty_detail_tds))
-            # Step 3.2 Gather and classify all tds into new_line object
+            duty_item_tds = BeautifulSoup(duty_detail_page, 'html.parser').find_all('td')
+            duty_detail_items = []
+            for td in duty_item_tds:
+                duty_detail_items.append(simplifyStr(BeautifulSoup(str(td), 'html.parser').getText()))
             duty = Duty()
-            tds_length = len(duty_detail_tds)
-            if tds_length > 2:
-                duty_detail_tds.pop(0)
-                duty_detail_tds.pop(0)
-                duty.main_duty.append(getPureText(duty_detail_tds.pop(0)))
-                pass
-            if len(duty_detail_tds) % 3 == 0:
-                while duty_detail_tds:
-                    duty.work_options.append(getPureText(duty_detail_tds.pop(0)))
-                    duty.offices.append(getPureText(duty_detail_tds.pop(0)))
-                    duty.remarks.append(getPureText(duty_detail_tds.pop(0)))
+            if len(duty_detail_items) > 10:
+                print(duty_detail_items)
+                while duty_detail_items and duty_detail_items.pop(0) != '追责依据及追责情形':
                     pass
+                if duty_detail_items:
+                    duty.main_duty.append(simplifyStr(duty_detail_items.pop(0)))
+                if duty_detail_items:
+                    duty.work_options.append(simplifyStr(duty_detail_items.pop(0)))
+                if duty_detail_items:
+                    duty.dependence.append(simplifyStr(duty_detail_items.pop(0)))
+                while duty_detail_items:
+                    duty.work_options.append(simplifyStr(duty_detail_items.pop(0)))
+
+                apartment.duties.append(duty)
                 pass
-            apartment.duties.append(duty)
+            else:
+                break
             pass
         pass
     # endregion
 
     # region Step 4：Get the bounder information from the child page
     if debug_mode:
-        bounder_details = gov_apartment_bounder_finder.findall(child_page)
-        bounder_details = simplifyList(bounder_details)
-        for bounder_detail in bounder_details:
-            bounder_link = root_link.replace("dutyIndex.do", "reviewDeptNexusDetails")
-            bounder_link += bounder_detail
+        bounder_item_index = 1
+        while True:
+            bounder_detail_link = root_link + '/sdzw/zrqd/boundaryduty/detail.do?' \
+                               + gov_apartment_code + '&subsn=' + str(bounder_item_index)
+            bounder_item_index = bounder_item_index + 1
 
-            # Step 4.1 Get bounder detail page's content and deal with the table
-            bounder_page = getLinkContent(bounder_link)
-            bounder_soup = BeautifulSoup(bounder_page, 'html.parser')
-            bounder_tds = bounder_soup.find_all(name='td')
-            bounder_tds = removeUselessTds(bounder_tds)
-            # Step 4.2 Gather and classify all tds into new_line object
+            # Step 3.1 Get duty detail page's content and deal with the table
+            bounder_detail_page = getLinkContent(bounder_detail_link)
+            bounder_item_tds = BeautifulSoup(bounder_detail_page, 'html.parser').find_all('td')
+            bounder_detail_items = []
+            for td in bounder_item_tds:
+                bounder_detail_items.append(simplifyStr(BeautifulSoup(str(td), 'html.parser').getText()))
             bounder = Bounder()
-            tds_length = len(bounder_tds)
-            if tds_length > 4:
-                bounder_tds.pop(0)
-                bounder_tds.pop(0)
-                bounder.manage_options.append(getPureText(bounder_tds.pop(0)))
-                bounder_tds.pop(0)
-                bounder_tds.pop(0)
-                tds_length = len(bounder_tds)
-                if tds_length > 5:
-                    bounder_tds.pop(-1)
-                    bounder_tds.pop(-1)
-                    bounder_tds.pop(-1)
-                    bounder.about_depends.append(getPureText(bounder_tds.pop(-1)))
-                    bounder_tds.pop(-1)
-                    bounder_tds.pop(-1)
+            if len(bounder_detail_items) > 6:
+                print(bounder_detail_items)
+                while bounder_detail_items and bounder_detail_items.pop(0) != '职责分工及协调配合机制':
                     pass
-                if len(bounder_tds) % 2 == 0:
-                    while bounder_tds:
-                        bounder.about_apartments.append(getPureText(bounder_tds.pop(0)))
-                        bounder.duties.append(getPureText(bounder_tds.pop(0)))
-                        pass
-                    pass
+                while len(bounder_detail_items) % 2 == 0 and bounder_detail_items:
+                    bounder.about_apartments.append(simplifyStr(bounder_detail_items.pop(0)))
+                    bounder.duties.append(simplifyStr(bounder_detail_items.pop(0)))
                 pass
-            apartment.bounders.append(bounder)
+            else:
+                break
             pass
+
+            bounder_item_divs = BeautifulSoup(bounder_detail_page, 'html.parser').find_all('div')
+            bounder_detail_items = []
+            for div in bounder_item_divs:
+                bounder_detail_items.append(simplifyStr(BeautifulSoup(str(div), 'html.parser').getText()))
+
+            bounder_detail_items = simplifyList(bounder_detail_items)
+            while bounder_detail_items and bounder_detail_items.pop(0) != '管理事项':
+                pass
+            while bounder_detail_items and bounder_detail_items[0] != '职责分工':
+                bounder.manage_options.append(simplifyStr(bounder_detail_items.pop(0)))
+
+            while bounder_detail_items and bounder_detail_items.pop(0) != '相关依据':
+                pass
+            while bounder_detail_items and bounder_detail_items[0] != '事　　例':
+                bounder.about_depends.append(simplifyStr(bounder_detail_items.pop(0)))
+                pass
+
+            apartment.bounders.append(bounder)
         pass
     # endregion
 
     # region Step 5: Get management rules information from the child page
+    # todo: bug occurred
+    # todo: Cannot get the Chinese letters because need the environment of Ajax
     if debug_mode:
         manage_rules = gov_apartment_manage_finder.findall(child_page)
         for manage_rule in manage_rules:
             apartment.manage_rules.append(manage_rule)
-            pass
-        pass
-    # endregion
-
-    # region Step 6: Get general information from the child page
-    if debug_mode:
-        general_details = gov_apartment_general_finder.findall(child_page)
-        # Lock the text and apply to the new_line
-        text_finder = re.compile(">(.*?)</")
-        while general_details and len(general_details) % 4 == 0:
-            service = Service()
-            service.service_options.append(text_finder.findall(general_details.pop(0) + "</")[0])
-            service.main_contents.append(text_finder.findall(general_details.pop(0) + "</")[0])
-            service.organizations.append(text_finder.findall(general_details.pop(0) + "</")[0])
-            general_details.pop(0)
-            apartment.services.append(service)
             pass
         pass
     # endregion
